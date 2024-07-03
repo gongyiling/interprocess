@@ -236,7 +236,7 @@ class mapped_region
    std::size_t priv_map_size()  const;
    bool priv_flush_param_check(std::size_t mapping_offset, void *&addr, std::size_t &numbytes) const;
    bool priv_shrink_param_check(std::size_t bytes, bool from_back, void *&shrink_page_start, std::size_t &shrink_page_bytes);
-   static void priv_size_from_mapping_size
+   static error_code_t priv_size_from_mapping_size
       (offset_t mapping_size, offset_t offset, offset_t page_offset, std::size_t &size);
    static offset_t priv_page_offset_addr_fixup(offset_t page_offset, const void *&addr);
 
@@ -342,7 +342,7 @@ inline bool mapped_region::priv_shrink_param_check
    }
 }
 
-inline void mapped_region::priv_size_from_mapping_size
+inline error_code_t mapped_region::priv_size_from_mapping_size
    (offset_t mapping_size, offset_t offset, offset_t page_offset, std::size_t &size)
 {
    //Check if mapping size fits in the user address space
@@ -350,8 +350,7 @@ inline void mapped_region::priv_size_from_mapping_size
    if(mapping_size < offset ||
       boost::uintmax_t(mapping_size - (offset - page_offset)) >
          boost::uintmax_t(std::size_t(-1))){
-      error_info err(size_error);
-      throw interprocess_exception(err);
+      return size_error;
    }
    size = static_cast<std::size_t>(mapping_size - offset);
 }
@@ -473,7 +472,11 @@ inline mapped_region::mapped_region
             return;
          }
          //This can throw
-         priv_size_from_mapping_size(mapping_size, offset, page_offset, size);
+         ec = priv_size_from_mapping_size(mapping_size, offset, page_offset, size);
+        if (ec != no_error)
+        {
+            return ec;
+        }
       }
 
       //Map with new offsets and size
