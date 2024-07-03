@@ -353,6 +353,7 @@ inline error_code_t mapped_region::priv_size_from_mapping_size
       return size_error;
    }
    size = static_cast<std::size_t>(mapping_size - offset);
+   return no_error;
 }
 
 inline offset_t mapped_region::priv_page_offset_addr_fixup(offset_t offset, const void *&address)
