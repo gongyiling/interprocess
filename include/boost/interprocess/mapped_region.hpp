@@ -665,7 +665,11 @@ inline mapped_region::mapped_region
          return;
       }
       //This can throw
-      priv_size_from_mapping_size(buf.st_size, offset, page_offset, size);
+      ec  = priv_size_from_mapping_size(buf.st_size, offset, page_offset, size);
+      if (ec != no_error)
+      {
+          return;
+      }
    }
 
    #ifdef MAP_NOSYNC
