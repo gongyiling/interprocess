@@ -56,7 +56,7 @@ namespace interprocess {
 
 //!A class that wraps a shared memory mapping that can be used to
 //!create mapped regions from the mapped files
-class shared_memory_object
+class shared_memory_object 
 {
    #if !defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
    //Non-copyable and non-assignable
