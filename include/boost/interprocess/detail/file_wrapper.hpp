@@ -44,19 +44,25 @@ class file_wrapper
 
    //!Creates a file object with name "name" and mode "mode", with the access mode "mode"
    //!If the file previously exists, throws an error.
-   file_wrapper(create_only_t, const char *name, mode_t mode, const permissions &perm = permissions())
-   {  this->priv_open_or_create(ipcdetail::DoCreate, name, mode, perm);  }
+   file_wrapper(create_only_t, const char *name, mode_t mode, error_code_t& ec, const permissions &perm = permissions())
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoCreate, name, mode, perm);
+   }
 
    //!Tries to create a file with name "name" and mode "mode", with the
    //!access mode "mode". If the file previously exists, it tries to open it with mode "mode".
    //!Otherwise throws an error.
-   file_wrapper(open_or_create_t, const char *name, mode_t mode, const permissions &perm  = permissions())
-   {  this->priv_open_or_create(ipcdetail::DoOpenOrCreate, name, mode, perm);  }
+   file_wrapper(open_or_create_t, const char *name, mode_t mode, error_code_t& ec, const permissions &perm  = permissions())
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoOpenOrCreate, name, mode, perm);
+   }
 
    //!Tries to open a file with name "name", with the access mode "mode".
    //!If the file does not previously exist, it throws an error.
-   file_wrapper(open_only_t, const char *name, mode_t mode)
-   {  this->priv_open_or_create(ipcdetail::DoOpen, name, mode, permissions());  }
+   file_wrapper(open_only_t, const char *name, mode_t mode, error_code_t& ec)
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoOpen, name, mode, permissions());
+   }
 
    #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
@@ -65,8 +71,10 @@ class file_wrapper
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   file_wrapper(create_only_t, const wchar_t *name, mode_t mode, const permissions &perm = permissions())
-   {  this->priv_open_or_create(ipcdetail::DoCreate, name, mode, perm);  }
+   file_wrapper(create_only_t, const wchar_t *name, mode_t mode, error_code_t& ec, const permissions &perm = permissions())
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoCreate, name, mode, perm);
+   }
 
    //!Tries to create a file with name "name" and mode "mode", with the
    //!access mode "mode". If the file previously exists, it tries to open it with mode "mode".
@@ -74,16 +82,20 @@ class file_wrapper
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   file_wrapper(open_or_create_t, const wchar_t *name, mode_t mode, const permissions &perm  = permissions())
-   {  this->priv_open_or_create(ipcdetail::DoOpenOrCreate, name, mode, perm);  }
+   file_wrapper(open_or_create_t, const wchar_t *name, mode_t mode, error_code_t& ec, const permissions &perm  = permissions())
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoOpenOrCreate, name, mode, perm);
+   }
 
    //!Tries to open a file with name "name", with the access mode "mode".
    //!If the file does not previously exist, it throws an error.
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   file_wrapper(open_only_t, const wchar_t *name, mode_t mode)
-   {  this->priv_open_or_create(ipcdetail::DoOpen, name, mode, permissions());  }
+   file_wrapper(open_only_t, const wchar_t *name, error_code_t& ec, mode_t mode)
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoOpen, name, mode, permissions());
+   }
 
    #endif   //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
    //!Moves the ownership of "moved"'s file to *this.
@@ -112,7 +124,7 @@ class file_wrapper
    static bool remove(const char *name);
 
    //!Sets the size of the file
-   void truncate(offset_t length);
+   error_code_t truncate(offset_t length);
 
    //!Closes the
    //!file
@@ -139,7 +151,7 @@ class file_wrapper
    void priv_close();
    //!Closes a previously opened file mapping. Never throws.
    template <class CharT>
-   bool priv_open_or_create(ipcdetail::create_enum_t type, const CharT *filename, mode_t mode, const permissions &perm);
+   error_code_t priv_open_or_create(ipcdetail::create_enum_t type, const CharT *filename, mode_t mode, const permissions &perm);
 
    file_handle_t  m_handle;
    mode_t         m_mode;
@@ -169,12 +181,11 @@ inline mode_t file_wrapper::get_mode() const
 {  return m_mode; }
 
 template <class CharT>
-inline bool file_wrapper::priv_open_or_create
+inline error_code_t file_wrapper::priv_open_or_create
    ( ipcdetail::create_enum_t type, const CharT *filename, mode_t mode, const permissions &perm)
 {
    if(mode != read_only && mode != read_write){
-      error_info err(mode_error);
-      throw interprocess_exception(err);
+      return mode_error;
    }
 
    //Open file existing native API to obtain the handle
@@ -190,30 +201,30 @@ inline bool file_wrapper::priv_open_or_create
       break;
       default:
          {
-            error_info err = other_error;
-            throw interprocess_exception(err);
+            return other_error;
          }
    }
 
    //Check for error
    if(m_handle == invalid_file()){
       error_info err = system_error_code();
-      throw interprocess_exception(err);
+      return err.get_error_code();
    }
 
    m_mode = mode;
-   return true;
+   return no_error;
 }
 
 inline bool file_wrapper::remove(const char *filename)
 {  return delete_file(filename); }
 
-inline void file_wrapper::truncate(offset_t length)
+inline error_code_t file_wrapper::truncate(offset_t length)
 {
    if(!truncate_file(m_handle, (std::size_t)length)){
       error_info err(system_error_code());
-      throw interprocess_exception(err);
+      return err.get_error_code();
    }
+   return no_error;
 }
 
 inline void file_wrapper::priv_close()

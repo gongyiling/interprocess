@@ -116,8 +116,8 @@ class basic_managed_mapped_file
    //!Creates mapped file and creates and places the segment manager.
    //!This can throw.
    basic_managed_mapped_file(create_only_t, const char *name,
-                             size_type size, const void *addr = 0, const permissions &perm = permissions())
-      : m_mfile(create_only, name, size, read_write, addr,
+                             size_type size, error_code_t& ec, const void *addr = 0, const permissions &perm = permissions())
+      : m_mfile(create_only, name, size, ec, read_write, addr,
                 create_open_func_t(get_this_pointer(), ipcdetail::DoCreate), perm)
    {}
 
@@ -127,17 +127,18 @@ class basic_managed_mapped_file
    //!This can throw.
    basic_managed_mapped_file (open_or_create_t,
                               const char *name, size_type size,
+							  error_code_t& ec,
                               const void *addr = 0, const permissions &perm = permissions())
-      : m_mfile(open_or_create, name, size, read_write, addr,
+      : m_mfile(open_or_create, name, size, ec, read_write, addr,
                 create_open_func_t(get_this_pointer(),
                 ipcdetail::DoOpenOrCreate), perm)
    {}
 
    //!Connects to a created mapped file and its segment manager.
    //!This can throw.
-   basic_managed_mapped_file (open_only_t, const char* name,
+   basic_managed_mapped_file (open_only_t, const char* name, error_code_t& ec,
                               const void *addr = 0)
-      : m_mfile(open_only, name, read_write, addr,
+      : m_mfile(open_only, name, ec, read_write, addr,
                 create_open_func_t(get_this_pointer(),
                 ipcdetail::DoOpen))
    {}
@@ -145,9 +146,9 @@ class basic_managed_mapped_file
    //!Connects to a created mapped file and its segment manager
    //!in copy_on_write mode.
    //!This can throw.
-   basic_managed_mapped_file (open_copy_on_write_t, const char* name,
+   basic_managed_mapped_file (open_copy_on_write_t, const char* name, error_code_t& ec,
                               const void *addr = 0)
-      : m_mfile(open_only, name, copy_on_write, addr,
+      : m_mfile(open_only, name, ec, copy_on_write, addr,
                 create_open_func_t(get_this_pointer(),
                 ipcdetail::DoOpen))
    {}
@@ -155,9 +156,9 @@ class basic_managed_mapped_file
    //!Connects to a created mapped file and its segment manager
    //!in read-only mode.
    //!This can throw.
-   basic_managed_mapped_file (open_read_only_t, const char* name,
+   basic_managed_mapped_file (open_read_only_t, const char* name, error_code_t& ec,
                               const void *addr = 0)
-      : m_mfile(open_only, name, read_only, addr,
+      : m_mfile(open_only, name, ec, read_only, addr,
                 create_open_func_t(get_this_pointer(),
                 ipcdetail::DoOpen))
    {}
@@ -170,8 +171,8 @@ class basic_managed_mapped_file
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
    basic_managed_mapped_file(create_only_t, const wchar_t *name,
-                             size_type size, const void *addr = 0, const permissions &perm = permissions())
-      : m_mfile(create_only, name, size, read_write, addr,
+                             size_type size, error_code_t& ec, const void *addr = 0, const permissions &perm = permissions())
+      : m_mfile(create_only, name, size, ec, read_write, addr,
                 create_open_func_t(get_this_pointer(), ipcdetail::DoCreate), perm)
    {}
 
@@ -183,9 +184,9 @@ class basic_managed_mapped_file
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
    basic_managed_mapped_file (open_or_create_t,
-                              const wchar_t *name, size_type size,
+                              const wchar_t *name, size_type size, error_code_t& ec,
                               const void *addr = 0, const permissions &perm = permissions())
-      : m_mfile(open_or_create, name, size, read_write, addr,
+      : m_mfile(open_or_create, name, size, ec, read_write, addr,
                 create_open_func_t(get_this_pointer(),
                 ipcdetail::DoOpenOrCreate), perm)
    {}
@@ -195,9 +196,9 @@ class basic_managed_mapped_file
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   basic_managed_mapped_file (open_only_t, const wchar_t* name,
+   basic_managed_mapped_file (open_only_t, const wchar_t* name, error_code_t& ec,
                               const void *addr = 0)
-      : m_mfile(open_only, name, read_write, addr,
+      : m_mfile(open_only, name, ec, read_write, addr,
                 create_open_func_t(get_this_pointer(),
                 ipcdetail::DoOpen))
    {}
@@ -208,9 +209,9 @@ class basic_managed_mapped_file
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   basic_managed_mapped_file (open_copy_on_write_t, const wchar_t* name,
+   basic_managed_mapped_file (open_copy_on_write_t, const wchar_t* name, error_code_t& ec,
                               const void *addr = 0)
-      : m_mfile(open_only, name, copy_on_write, addr,
+      : m_mfile(open_only, name, ec, copy_on_write, addr,
                 create_open_func_t(get_this_pointer(),
                 ipcdetail::DoOpen))
    {}
@@ -221,9 +222,9 @@ class basic_managed_mapped_file
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   basic_managed_mapped_file (open_read_only_t, const wchar_t* name,
+   basic_managed_mapped_file (open_read_only_t, const wchar_t* name, error_code_t& ec,
                               const void *addr = 0)
-      : m_mfile(open_only, name, read_only, addr,
+      : m_mfile(open_only, name, ec, read_only, addr,
                 create_open_func_t(get_this_pointer(),
                 ipcdetail::DoOpen))
    {}

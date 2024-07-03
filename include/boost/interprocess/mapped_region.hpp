@@ -127,6 +127,7 @@ class mapped_region
    template<class MemoryMappable>
    mapped_region(const MemoryMappable& mapping
                 ,mode_t mode
+				, error_code_t& ec
                 ,offset_t offset = 0
                 ,std::size_t size = 0
                 ,const void *address = 0
@@ -391,6 +392,7 @@ template<class MemoryMappable>
 inline mapped_region::mapped_region
    (const MemoryMappable &mapping
    ,mode_t mode
+   ,error_code_t& ec
    ,offset_t offset
    ,std::size_t size
    ,const void *address
@@ -425,8 +427,8 @@ inline mapped_region::mapped_region
          break;
          default:
             {
-               error_info err(mode_error);
-               throw interprocess_exception(err);
+             ec = mode_error;
+         		return;
             }
          break;
       }
@@ -446,7 +448,8 @@ inline mapped_region::mapped_region
          //Check if all is correct
          if(!native_mapping_handle){
             error_info err ((int)winapi::get_last_error());
-            throw interprocess_exception(err);
+            ec = err.get_error_code();
+            return;
          }
          handle_to_close = native_mapping_handle;
       }
@@ -466,7 +469,8 @@ inline mapped_region::mapped_region
          offset_t mapping_size;
          if(!winapi::get_file_mapping_size(native_mapping_handle, mapping_size)){
             error_info err((int)winapi::get_last_error());
-            throw interprocess_exception(err);
+            ec = err.get_error_code();
+            return;
          }
          //This can throw
          priv_size_from_mapping_size(mapping_size, offset, page_offset, size);
@@ -482,7 +486,8 @@ inline mapped_region::mapped_region
       //Check error
       if(!base){
          error_info err((int)winapi::get_last_error());
-         throw interprocess_exception(err);
+         ec = err.get_error_code();
+         return;
       }
 
       //Calculate new base for the user
@@ -497,8 +502,10 @@ inline mapped_region::mapped_region
    if(!winapi::duplicate_current_process_handle(mhandle.handle, &m_file_or_mapping_hnd)){
       error_info err((int)winapi::get_last_error());
       this->priv_close();
-      throw interprocess_exception(err);
+      ec = err.get_error_code();
+      return;
    }
+   ec = no_error;
 }
 
 inline bool mapped_region::flush(std::size_t mapping_offset, std::size_t numbytes, bool async)
@@ -584,6 +591,7 @@ template<class MemoryMappable>
 inline mapped_region::mapped_region
    ( const MemoryMappable &mapping
    , mode_t mode
+   , error_code_t& ec
    , offset_t offset
    , std::size_t size
    , const void *address
@@ -600,7 +608,8 @@ inline mapped_region::mapped_region
       int ret = ::shmctl(map_hnd.handle, IPC_STAT, &xsi_ds);
       if(ret == -1){
          error_info err(system_error_code());
-         throw interprocess_exception(err);
+         ec = err.get_error_code();
+         return;
       }
       //Compare sizess
       if(size == 0){
@@ -608,7 +617,8 @@ inline mapped_region::mapped_region
       }
       else if(size != (std::size_t)xsi_ds.shm_segsz){
          error_info err(size_error);
-         throw interprocess_exception(err);
+         ec = err.get_error_code();
+         return;
       }
       //Calculate flag
       int flag = map_options == default_map_options ? 0 : map_options;
@@ -617,7 +627,8 @@ inline mapped_region::mapped_region
       }
       else if(m_mode != read_write){
          error_info err(mode_error);
-         throw interprocess_exception(err);
+         ec = err.get_error_code();
+         return;
       }
       //Attach memory
       //Some old shmat implementation take the address as a non-const void pointer
@@ -626,7 +637,8 @@ inline mapped_region::mapped_region
       void *base = ::shmat(map_hnd.handle, final_address, flag);
       if(base == (void*)-1){
          error_info err(system_error_code());
-         throw interprocess_exception(err);
+         ec = err.get_error_code();
+         return;
       }
       //Update members
       m_base   = base;
@@ -634,6 +646,7 @@ inline mapped_region::mapped_region
       m_mode   = mode;
       m_page_offset = 0;
       m_is_xsi = true;
+      ec = no_error;
       return;
    }
    #endif   //ifdef BOOST_INTERPROCESS_XSI_SHARED_MEMORY_OBJECTS
@@ -645,7 +658,8 @@ inline mapped_region::mapped_region
       struct ::stat buf;
       if(0 != fstat(map_hnd.handle, &buf)){
          error_info err(system_error_code());
-         throw interprocess_exception(err);
+         ec = err.get_error_code();
+         return;
       }
       //This can throw
       priv_size_from_mapping_size(buf.st_size, offset, page_offset, size);
@@ -688,7 +702,8 @@ inline mapped_region::mapped_region
       default:
          {
             error_info err(mode_error);
-            throw interprocess_exception(err);
+            ec = err.get_error_code();
+            return;
          }
       break;
    }
@@ -704,7 +719,8 @@ inline mapped_region::mapped_region
    //Check if mapping was successful
    if(base == MAP_FAILED){
       error_info err = system_error_code();
-      throw interprocess_exception(err);
+      ec = err.get_error_code();
+      return;
    }
 
    //Calculate new base for the user
@@ -716,8 +732,10 @@ inline mapped_region::mapped_region
    if(address && (base != address)){
       error_info err(busy_error);
       this->priv_close();
-      throw interprocess_exception(err);
+      ec = err.get_error_code();
+      return;
    }
+   ec = no_error;
 }
 
 inline bool mapped_region::shrink_by(std::size_t bytes, bool from_back)

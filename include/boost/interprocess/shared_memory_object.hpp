@@ -347,7 +347,7 @@ inline bool use_filesystem_based_posix()
 }  //shared_memory_object_detail
 
 template<class CharT>
-inline bool shared_memory_object::priv_open_or_create
+inline error_code_t shared_memory_object::priv_open_or_create
    (ipcdetail::create_enum_t type,
     const CharT *filename,
     mode_t mode, const permissions &perm)
@@ -376,8 +376,7 @@ inline bool shared_memory_object::priv_open_or_create
       oflag |= O_RDWR;
    }
    else{
-      error_info err(mode_error);
-      throw interprocess_exception(err);
+      return mode_error;
    }
    ::mode_t unix_perm = perm.get_permissions();
 
@@ -424,8 +423,7 @@ inline bool shared_memory_object::priv_open_or_create
       break;
       default:
       {
-         error_info err = other_error;
-         throw interprocess_exception(err);
+         return other_error;
       }
    }
 
@@ -433,12 +431,12 @@ inline bool shared_memory_object::priv_open_or_create
    if(m_handle < 0){
       error_info err = errno;
       this->priv_close();
-      throw interprocess_exception(err);
+      return err.get_error_code();
    }
 
    m_filename = filename;
    m_mode = mode;
-   return true;
+   return no_error;
 }
 
 inline bool shared_memory_object::remove(const char *filename)
@@ -465,7 +463,7 @@ inline bool shared_memory_object::remove(const char *filename)
    } BOOST_CATCH_END
 }
 
-inline void shared_memory_object::truncate(offset_t length)
+inline error_code_t shared_memory_object::truncate(offset_t length)
 {
    #ifdef BOOST_INTERPROCESS_POSIX_FALLOCATE
    int ret = EINTR;
@@ -475,7 +473,7 @@ inline void shared_memory_object::truncate(offset_t length)
 
    if (ret && ret != EOPNOTSUPP && ret != ENODEV){
       error_info err(ret);
-      throw interprocess_exception(err);
+      return err.get_error_code();
    }
    //ftruncate fallback
    #endif //BOOST_INTERPROCESS_POSIX_FALLOCATE
@@ -485,8 +483,9 @@ inline void shared_memory_object::truncate(offset_t length)
       if (errno == EINTR)
          goto handle_eintr;
       error_info err(system_error_code());
-      throw interprocess_exception(err);
+      return err.get_error_code();
    }
+   return no_error;
 }
 
 inline void shared_memory_object::priv_close()

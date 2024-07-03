@@ -358,7 +358,7 @@ class managed_open_or_create_impl
 	   }
 
 	   //If the following throws, we will truncate the file to 1
-	   mapped_region region(dev, read_write, 0, 0, addr, ec);
+	   mapped_region region(dev, read_write, ec, 0, 0, addr);
 	   if (ec != no_error)
 	   {
            truncate_device<FileBased>(dev, 1u, file_like_t());
@@ -429,8 +429,12 @@ class managed_open_or_create_impl
             return corrupted_error;
          }
       }
-
-      mapped_region  region(dev, ronly ? read_only : (cow ? copy_on_write : read_write), 0, 0, addr);
+      error_code_t ec = other_error;
+      mapped_region  region(dev, ronly ? read_only : (cow ? copy_on_write : read_write), ec, 0, 0, addr);
+      if (ec != no_error)
+      {
+          return ec;
+      }
 
       boost::uint32_t *patomic_word = static_cast<boost::uint32_t*>(region.get_address());
       boost::uint32_t value = atomic_read32(patomic_word);
@@ -455,7 +459,11 @@ class managed_open_or_create_impl
             mapped_region null_map;
             region.swap(null_map);
          }
-         mapped_region  final_size_map(dev, ronly ? read_only : (cow ? copy_on_write : read_write), 0, 0, addr);
+         mapped_region  final_size_map(dev, ronly ? read_only : (cow ? copy_on_write : read_write), ec, 0, 0, addr);
+         if (ec != no_error)
+         {
+             return ec;
+         }
          final_size_map.swap(region);
       }
       construct_func( static_cast<char*>(region.get_address()) + ManagedOpenOrCreateUserOffset
