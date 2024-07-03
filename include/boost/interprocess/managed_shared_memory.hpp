@@ -121,9 +121,9 @@ class basic_managed_shared_memory
    //!Creates shared memory and creates and places the segment manager.
    //!This can throw.
    basic_managed_shared_memory(create_only_t, const char *name,
-                             size_type size, const void *addr = 0, const permissions& perm = permissions())
+                             size_type size, error_code_t& ec, const void *addr = 0, const permissions& perm = permissions())
       : base_t()
-      , base2_t(create_only, name, size, read_write, addr,
+      , base2_t(create_only, name, size, ec, read_write, addr,
                 create_open_func_t(get_this_pointer(), ipcdetail::DoCreate), perm)
    {}
 
@@ -133,9 +133,10 @@ class basic_managed_shared_memory
    //!This can throw.
    basic_managed_shared_memory (open_or_create_t,
                               const char *name, size_type size,
+                              error_code_t& ec,
                               const void *addr = 0, const permissions& perm = permissions())
       : base_t()
-      , base2_t(open_or_create, name, size, read_write, addr,
+      , base2_t(open_or_create, name, size, ec, read_write, addr,
                 create_open_func_t(get_this_pointer(),
                 ipcdetail::DoOpenOrCreate), perm)
    {}
@@ -143,7 +144,7 @@ class basic_managed_shared_memory
    //!Connects to a created shared memory and its segment manager.
    //!in copy_on_write mode.
    //!This can throw.
-   basic_managed_shared_memory (open_copy_on_write_t, const char* name,
+   basic_managed_shared_memory (open_copy_on_write_t, const char* name, error_code_t& ec,
                                 const void *addr = 0)
       : base_t()
       , base2_t(open_only, name, copy_on_write, addr,
@@ -154,7 +155,7 @@ class basic_managed_shared_memory
    //!Connects to a created shared memory and its segment manager.
    //!in read-only mode.
    //!This can throw.
-   basic_managed_shared_memory (open_read_only_t, const char* name,
+   basic_managed_shared_memory (open_read_only_t, const char* name, error_code_t& ec,
                                 const void *addr = 0)
       : base_t()
       , base2_t(open_only, name, read_only, addr,
@@ -164,7 +165,7 @@ class basic_managed_shared_memory
 
    //!Connects to a created shared memory and its segment manager.
    //!This can throw.
-   basic_managed_shared_memory (open_only_t, const char* name,
+   basic_managed_shared_memory (open_only_t, const char* name, error_code_t& ec,
                                 const void *addr = 0)
       : base_t()
       , base2_t(open_only, name, read_write, addr,
@@ -180,9 +181,9 @@ class basic_managed_shared_memory
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
    basic_managed_shared_memory(create_only_t, const wchar_t *name,
-                             size_type size, const void *addr = 0, const permissions& perm = permissions())
+                             size_type size, error_code_t& ec, const void *addr = 0, const permissions& perm = permissions())
       : base_t()
-      , base2_t(create_only, name, size, read_write, addr,
+      , base2_t(create_only, name, size, ec, read_write, addr,
                 create_open_func_t(get_this_pointer(), ipcdetail::DoCreate), perm)
    {}
 
@@ -194,10 +195,10 @@ class basic_managed_shared_memory
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
    basic_managed_shared_memory (open_or_create_t,
-                              const wchar_t *name, size_type size,
+                              const wchar_t *name, size_type size, error_code_t& ec,
                               const void *addr = 0, const permissions& perm = permissions())
       : base_t()
-      , base2_t(open_or_create, name, size, read_write, addr,
+      , base2_t(open_or_create, name, size, ec, read_write, addr,
                 create_open_func_t(get_this_pointer(),
                 ipcdetail::DoOpenOrCreate), perm)
    {}
@@ -208,7 +209,7 @@ class basic_managed_shared_memory
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   basic_managed_shared_memory (open_copy_on_write_t, const wchar_t* name,
+   basic_managed_shared_memory (open_copy_on_write_t, const wchar_t* name, error_code_t& ec,
                                 const void *addr = 0)
       : base_t()
       , base2_t(open_only, name, copy_on_write, addr,
@@ -222,7 +223,7 @@ class basic_managed_shared_memory
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   basic_managed_shared_memory (open_read_only_t, const wchar_t* name,
+   basic_managed_shared_memory (open_read_only_t, const wchar_t* name, error_code_t& ec,
                                 const void *addr = 0)
       : base_t()
       , base2_t(open_only, name, read_only, addr,
@@ -235,7 +236,7 @@ class basic_managed_shared_memory
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   basic_managed_shared_memory (open_only_t, const wchar_t* name,
+   basic_managed_shared_memory (open_only_t, const wchar_t* name, error_code_t& ec,
                                 const void *addr = 0)
       : base_t()
       , base2_t(open_only, name, read_write, addr,

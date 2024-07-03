@@ -102,11 +102,12 @@ class managed_open_or_create_impl
    managed_open_or_create_impl(create_only_t,
                  const DeviceId & id,
                  std::size_t size,
+				 error_code_t& ec,
                  mode_t mode,
                  const void *addr,
                  const permissions &perm)
    {
-      priv_open_or_create
+       ec = priv_open_or_create
          ( DoCreate
          , id
          , size
@@ -119,10 +120,11 @@ class managed_open_or_create_impl
    template <class DeviceId>
    managed_open_or_create_impl(open_only_t,
                  const DeviceId & id,
+                 error_code_t& ec,
                  mode_t mode,
                  const void *addr)
    {
-      priv_open_or_create
+       ec = priv_open_or_create
          ( DoOpen
          , id
          , 0
@@ -136,11 +138,12 @@ class managed_open_or_create_impl
    managed_open_or_create_impl(open_or_create_t,
                  const DeviceId & id,
                  std::size_t size,
+                 error_code_t& ec,
                  mode_t mode,
                  const void *addr,
                  const permissions &perm)
    {
-      priv_open_or_create
+       ec = priv_open_or_create
          ( DoOpenOrCreate
          , id
          , size
@@ -154,12 +157,13 @@ class managed_open_or_create_impl
    managed_open_or_create_impl(create_only_t,
                  const DeviceId & id,
                  std::size_t size,
+				 error_code_t& ec,
                  mode_t mode,
                  const void *addr,
                  const ConstructFunc &construct_func,
                  const permissions &perm)
    {
-      priv_open_or_create
+       ec = priv_open_or_create
          (DoCreate
          , id
          , size
@@ -172,11 +176,12 @@ class managed_open_or_create_impl
    template <class DeviceId, class ConstructFunc>
    managed_open_or_create_impl(open_only_t,
                  const DeviceId & id,
+                 error_code_t& ec,
                  mode_t mode,
                  const void *addr,
                  const ConstructFunc &construct_func)
    {
-      priv_open_or_create
+       ec = priv_open_or_create
          ( DoOpen
          , id
          , 0
@@ -190,12 +195,13 @@ class managed_open_or_create_impl
    managed_open_or_create_impl(open_or_create_t,
                  const DeviceId & id,
                  std::size_t size,
+                 error_code_t& ec,
                  mode_t mode,
                  const void *addr,
                  const ConstructFunc &construct_func,
                  const permissions &perm)
    {
-      priv_open_or_create
+      ec = priv_open_or_create
          ( DoOpenOrCreate
          , id
          , size
@@ -251,12 +257,16 @@ class managed_open_or_create_impl
 
    //These are templatized to allow explicit instantiations
    template<bool dummy>
-   static void truncate_device(DeviceAbstraction &, offset_t, false_)
-   {} //Empty
+   static error_code_t truncate_device(DeviceAbstraction &, offset_t, false_)
+   {
+       return no_error;
+   } //Empty
 
    template<bool dummy>
-   static void truncate_device(DeviceAbstraction &dev, offset_t size, true_)
-   {  dev.truncate(size);  }
+   static error_code_t truncate_device(DeviceAbstraction &dev, offset_t size, true_)
+   {
+	   return dev.truncate(size);
+   }
 
 
    template<bool dummy>
@@ -269,21 +279,25 @@ class managed_open_or_create_impl
 
    //These are templatized to allow explicit instantiations
    template<bool dummy, class DeviceId>
-   static void create_device(DeviceAbstraction &dev, const DeviceId & id, std::size_t size, const permissions &perm, false_ /*file_like*/)
+   static error_code_t create_device(DeviceAbstraction &dev, const DeviceId & id, std::size_t size, const permissions &perm, false_ /*file_like*/)
    {
-      DeviceAbstraction tmp(create_only, id, read_write, size, perm);
+   	  error_code_t ec = other_error;
+      DeviceAbstraction tmp(create_only, id, read_write, size, ec, perm);
       tmp.swap(dev);
+      return ec;
    }
 
    template<bool dummy, class DeviceId>
-   static void create_device(DeviceAbstraction &dev, const DeviceId & id, std::size_t, const permissions &perm, true_ /*file_like*/)
+   static error_code_t create_device(DeviceAbstraction &dev, const DeviceId & id, std::size_t, const permissions &perm, true_ /*file_like*/)
    {
-      DeviceAbstraction tmp(create_only, id, read_write, perm);
+   	  error_code_t ec = other_error;
+      DeviceAbstraction tmp(create_only, id, read_write, ec, perm);
       tmp.swap(dev);
+      return ec;
    }
 
    template <class DeviceId>
-   static bool do_create_else_open(DeviceAbstraction &dev, const DeviceId & id, std::size_t size, const permissions &perm)
+   static bool do_create_else_open(DeviceAbstraction &dev, const DeviceId & id, std::size_t size, const permissions &perm, error_code_t& ec)
    {
       //This loop is very ugly, but brute force is sometimes better
       //than diplomacy. In POSIX file-based resources we can' know if we
@@ -294,96 +308,91 @@ class managed_open_or_create_impl
       //
       //We'll put a maximum retry limit just to avoid possible deadlocks, we don't
       //want to support pathological use cases.
-      spin_wait swait;
-      unsigned tries = 0;
-      while(1){
-         BOOST_TRY{
-            create_device<FileBased>(dev, id, size, perm, file_like_t());
-            return true;
-         }
-         BOOST_CATCH(interprocess_exception &ex){
-            #ifndef BOOST_NO_EXCEPTIONS
-            if(ex.get_error_code() != already_exists_error){
-               BOOST_RETHROW
-            }
-            else if (++tries == MaxCreateOrOpenTries) {
-               //File existing when trying to create, but non-existing when
-               //trying to open, and tried MaxCreateOrOpenTries times. Something fishy
-               //is happening here and we can't solve it
-               throw interprocess_exception(error_info(corrupted_error));
-            }
-            else{
-               BOOST_TRY{
-                  DeviceAbstraction tmp(open_only, id, read_write);
-                  dev.swap(tmp);
-                  return false;
-               }
-               BOOST_CATCH(interprocess_exception &e){
-                  if(e.get_error_code() != not_found_error){
-                     BOOST_RETHROW
-                  }
-               }
-               BOOST_CATCH(...){
-                  BOOST_RETHROW
-               } BOOST_CATCH_END
-            }
-            #endif   //#ifndef BOOST_NO_EXCEPTIONS
-         }
-         BOOST_CATCH(...){
-            BOOST_RETHROW
-         } BOOST_CATCH_END
-         swait.yield();
-      }
-      return false;
+	   spin_wait swait;
+	   unsigned tries = 0;
+	   while (1) {
+		   ec = create_device<FileBased>(dev, id, size, perm, file_like_t());
+		   if (ec == no_error)
+		   {
+			   return true;
+		   }
+
+		   if (ec != already_exists_error) {
+			   return false;
+		   }
+		   else if (++tries == MaxCreateOrOpenTries) {
+			   //File existing when trying to create, but non-existing when
+			   //trying to open, and tried MaxCreateOrOpenTries times. Something fishy
+			   //is happening here and we can't solve it
+               ec = corrupted_error;
+               return false;
+		   }
+		   else {
+			   DeviceAbstraction tmp(open_only, id, read_write, ec);
+			   if (ec == no_error)
+			   {
+				   dev.swap(tmp);
+				   return false;
+			   }
+
+			   if (ec != not_found_error)
+               {
+                   return false;
+			   }
+		   }
+		   swait.yield();
+	   }
+	   return false;
    }
 
    template <class ConstructFunc>
-   static void do_map_after_create
-      (DeviceAbstraction &dev, mapped_region &final_region,
-       std::size_t size, const void *addr, ConstructFunc construct_func)
+   static error_code_t do_map_after_create
+   (DeviceAbstraction& dev, mapped_region& final_region,
+	   std::size_t size, const void* addr, ConstructFunc construct_func)
    {
-      BOOST_TRY{
-         //If this throws, we are lost
-         truncate_device<FileBased>(dev, static_cast<offset_t>(size), file_like_t());
+	   error_code_t ec = other_error;
+	   ec = truncate_device<FileBased>(dev, static_cast<offset_t>(size), file_like_t());
+	   if (ec != no_error)
+	   {
+		   return ec;
+	   }
 
-         //If the following throws, we will truncate the file to 1
-         mapped_region region(dev, read_write, 0, 0, addr);
-         boost::uint32_t *patomic_word = 0;  //avoid gcc warning
-         patomic_word = static_cast<boost::uint32_t*>(region.get_address());
-         boost::uint32_t previous = atomic_cas32(patomic_word, InitializingSegment, UninitializedSegment);
+	   //If the following throws, we will truncate the file to 1
+	   mapped_region region(dev, read_write, 0, 0, addr, ec);
+	   if (ec != no_error)
+	   {
+           truncate_device<FileBased>(dev, 1u, file_like_t());
+		   return ec;
+	   }
 
-         if(previous == UninitializedSegment){
-            BOOST_TRY{
-               construct_func( static_cast<char*>(region.get_address()) + ManagedOpenOrCreateUserOffset
-                              , size - ManagedOpenOrCreateUserOffset, true);
-               //All ok, just move resources to the external mapped region
-               final_region.swap(region);
-            }
-            BOOST_CATCH(...){
-               atomic_write32(patomic_word, CorruptedSegment);
-               BOOST_RETHROW
-            } BOOST_CATCH_END
-            atomic_write32(patomic_word, InitializedSegment);
-         }
-         else{
-            atomic_write32(patomic_word, CorruptedSegment);
-            throw interprocess_exception(error_info(corrupted_error));
-         }
-      }
-      BOOST_CATCH(...){
-         BOOST_TRY{
-            truncate_device<FileBased>(dev, 1u, file_like_t());
-         }
-         BOOST_CATCH(...){
-         }
-         BOOST_CATCH_END
-         BOOST_RETHROW
-      }
-      BOOST_CATCH_END
+	   boost::uint32_t* patomic_word = 0;  //avoid gcc warning
+	   patomic_word = static_cast<boost::uint32_t*>(region.get_address());
+	   boost::uint32_t previous = atomic_cas32(patomic_word, InitializingSegment, UninitializedSegment);
+	   if (previous == UninitializedSegment)
+	   {
+		   BOOST_TRY
+		   {
+				 construct_func(static_cast<char*>(region.get_address()) + ManagedOpenOrCreateUserOffset
+								, size - ManagedOpenOrCreateUserOffset, true);
+				//All ok, just move resources to the external mapped region
+				 final_region.swap(region);
+		   }
+			BOOST_CATCH(...)
+		   {
+			   atomic_write32(patomic_word, CorruptedSegment);
+			   BOOST_RETHROW
+		   } BOOST_CATCH_END
+	   	   atomic_write32(patomic_word, InitializedSegment);
+	   }
+	   else {
+		   atomic_write32(patomic_word, CorruptedSegment);
+		   return corrupted_error;
+	   }
+	   return ec;
    }
 
    template <class ConstructFunc>
-   static void do_map_after_open
+   static error_code_t do_map_after_open
       ( DeviceAbstraction &dev, mapped_region &final_region
       , const void *addr, ConstructFunc construct_func
       , bool ronly, bool cow)
@@ -401,7 +410,7 @@ class managed_open_or_create_impl
          while(1){
             if(!get_file_size(file_handle_from_mapping_handle(dev.get_mapping_handle()), filesize)){
                error_info err = system_error_code();
-               throw interprocess_exception(err);
+               return err.get_error_code();
             }
             if (filesize != 0)
                break;
@@ -410,14 +419,14 @@ class managed_open_or_create_impl
                //to minimally increase the size of the file: something bad has happened
                const usduration elapsed(microsec_clock<ustime>::universal_time() - ustime_start);
                if (elapsed > TimeoutSec){
-                  throw interprocess_exception(error_info(corrupted_error));
+                  return corrupted_error;
                }
                swait.yield();
             }
          }
          //The creator detected an error creating the file and signalled it with size 1
          if(filesize == 1){
-            throw interprocess_exception(error_info(corrupted_error));
+            return corrupted_error;
          }
       }
 
@@ -431,13 +440,13 @@ class managed_open_or_create_impl
          spin_wait swait;
          while ((value = atomic_read32(patomic_word)) != InitializedSegment){
             if(value == CorruptedSegment){
-               throw interprocess_exception(error_info(corrupted_error));
+               return corrupted_error;
             }
             //More than MaxZeroTruncateTimeSec seconds waiting to the creator
             //to minimally increase the size of the file: something bad has happened
             const usduration elapsed(microsec_clock<ustime>::universal_time() - ustime_start);
             if (elapsed > TimeoutSec){
-               throw interprocess_exception(error_info(corrupted_error));
+               return corrupted_error;
             }
             swait.yield();
          }
@@ -454,10 +463,11 @@ class managed_open_or_create_impl
                      , false);
       //All ok, just move resources to the external mapped region
       final_region.swap(region);
+      return no_error;
    }
 
    template <class DeviceId, class ConstructFunc> inline
-   void priv_open_or_create
+   error_code_t priv_open_or_create
       (create_enum_t type,
        const DeviceId & id,
        std::size_t size,
@@ -470,14 +480,15 @@ class managed_open_or_create_impl
          const std::size_t func_min_size = construct_func.get_min_size();
          if( (std::size_t(-1) - ManagedOpenOrCreateUserOffset) < func_min_size ||
              size < (func_min_size + ManagedOpenOrCreateUserOffset) ){
-            throw interprocess_exception(error_info(size_error));
+            return size_error;
          }
          //Check size can be represented by offset_t (used by truncate)
          if (!check_offset_t_size<FileBased>(size, file_like_t())){
-           throw interprocess_exception(error_info(size_error));
+           return size_error;
          }
       }
 
+      error_code_t ec = error_code_t::other_error;
       //Now create the device (file, shm file, etc.)
       DeviceAbstraction dev;
       (void)mode;
@@ -485,29 +496,39 @@ class managed_open_or_create_impl
       bool ronly   = false;
       bool cow     = false;
       if(type == DoOpen){
-         DeviceAbstraction tmp(open_only, id, mode == read_write ? read_write : read_only);
+         DeviceAbstraction tmp(open_only, id, mode == read_write ? read_write : read_only, ec);
          tmp.swap(dev);
          ronly = mode == read_only;
          cow = mode == copy_on_write;
       }
       else if(type == DoCreate){
-         create_device<FileBased>(dev, id, size, perm, file_like_t());
+      	 ec = create_device<FileBased>(dev, id, size, perm, file_like_t());
          created = true;
       }
       else { //DoOpenOrCreate
-         created = this->do_create_else_open(dev, id, size, perm);
+         created = this->do_create_else_open(dev, id, size, perm, ec);
+      }
+      if (ec != no_error)
+      {
+          return ec;
       }
 
       if(created){
-         this->do_map_after_create(dev, m_mapped_region, size, addr, construct_func);
+          ec = this->do_map_after_create(dev, m_mapped_region, size, addr, construct_func);
       }
       else{
-         this->do_map_after_open(dev, m_mapped_region, addr, construct_func, ronly, cow);
+          ec = this->do_map_after_open(dev, m_mapped_region, addr, construct_func, ronly, cow);
+      }
+
+      if (ec != no_error)
+      {
+          return ec;
       }
 
       if(StoreDevice){
          this->DevHolder::get_device() = boost::move(dev);
       }
+      return ec;
    }
 
    friend void swap(managed_open_or_create_impl &left, managed_open_or_create_impl &right)

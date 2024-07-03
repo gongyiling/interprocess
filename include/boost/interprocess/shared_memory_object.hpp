@@ -69,19 +69,25 @@ class shared_memory_object
 
    //!Creates a shared memory object with name "name" and mode "mode", with the access mode "mode"
    //!If the file previously exists, throws an error.*/
-   shared_memory_object(create_only_t, const char *name, mode_t mode, const permissions &perm = permissions())
-   {  this->priv_open_or_create(ipcdetail::DoCreate, name, mode, perm);  }
+   shared_memory_object(create_only_t, const char *name, mode_t mode, error_code_t& ec, const permissions &perm = permissions())
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoCreate, name, mode, perm);
+   }
 
    //!Tries to create a shared memory object with name "name" and mode "mode", with the
    //!access mode "mode". If the file previously exists, it tries to open it with mode "mode".
    //!Otherwise throws an error.
-   shared_memory_object(open_or_create_t, const char *name, mode_t mode, const permissions &perm = permissions())
-   {  this->priv_open_or_create(ipcdetail::DoOpenOrCreate, name, mode, perm);  }
+   shared_memory_object(open_or_create_t, const char *name, mode_t mode, error_code_t& ec, const permissions &perm = permissions())
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoOpenOrCreate, name, mode, perm);
+   }
 
    //!Tries to open a shared memory object with name "name", with the access mode "mode".
    //!If the file does not previously exist, it throws an error.
-   shared_memory_object(open_only_t, const char *name, mode_t mode)
-   {  this->priv_open_or_create(ipcdetail::DoOpen, name, mode, permissions());  }
+   shared_memory_object(open_only_t, const char *name, mode_t mode, error_code_t& ec)
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoOpen, name, mode, permissions());
+   }
 
    #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
@@ -90,8 +96,10 @@ class shared_memory_object
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   shared_memory_object(create_only_t, const wchar_t*name, mode_t mode, const permissions &perm = permissions())
-   {  this->priv_open_or_create(ipcdetail::DoCreate, name, mode, perm);  }
+   shared_memory_object(create_only_t, const wchar_t*name, mode_t mode, error_code_t& ec, const permissions &perm = permissions())
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoCreate, name, mode, perm);
+   }
 
    //!Tries to create a shared memory object with name "name" and mode "mode", with the
    //!access mode "mode". If the file previously exists, it tries to open it with mode "mode".
@@ -99,16 +107,20 @@ class shared_memory_object
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   shared_memory_object(open_or_create_t, const wchar_t*name, mode_t mode, const permissions &perm = permissions())
-   {  this->priv_open_or_create(ipcdetail::DoOpenOrCreate, name, mode, perm);  }
+   shared_memory_object(open_or_create_t, const wchar_t*name, mode_t mode, error_code_t& ec, const permissions &perm = permissions())
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoOpenOrCreate, name, mode, perm);
+   }
 
    //!Tries to open a shared memory object with name "name", with the access mode "mode".
    //!If the file does not previously exist, it throws an error.
    //! 
    //!Note: This function is only available on operating systems with
    //!      native wchar_t APIs (e.g. Windows).
-   shared_memory_object(open_only_t, const wchar_t*name, mode_t mode)
-   {  this->priv_open_or_create(ipcdetail::DoOpen, name, mode, permissions());  }
+   shared_memory_object(open_only_t, const wchar_t*name, mode_t mode, error_code_t& ec)
+   {
+       ec = this->priv_open_or_create(ipcdetail::DoOpen, name, mode, permissions());
+   }
 
    #endif //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
@@ -149,7 +161,7 @@ class shared_memory_object
    #endif //defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES) || defined(BOOST_INTERPROCESS_DOXYGEN_INVOKED)
 
    //!Sets the size of the shared memory mapping
-   void truncate(offset_t length);
+   error_code_t truncate(offset_t length);
 
    //!Destroys *this and indicates that the calling process is finished using
    //!the resource. All mapped regions are still
@@ -181,7 +193,7 @@ class shared_memory_object
 
    //!Opens or creates a shared memory object.
    template<class CharT>
-   bool priv_open_or_create(ipcdetail::create_enum_t type, const CharT *filename, mode_t mode, const permissions &perm);
+   error_code_t priv_open_or_create(ipcdetail::create_enum_t type, const CharT *filename, mode_t mode, const permissions &perm);
 
    file_handle_t     m_handle;
    mode_t            m_mode;
@@ -224,7 +236,7 @@ inline mode_t shared_memory_object::get_mode() const BOOST_NOEXCEPT
 #if !defined(BOOST_INTERPROCESS_POSIX_SHARED_MEMORY_OBJECTS)
 
 template<class CharT>
-inline bool shared_memory_object::priv_open_or_create
+inline error_code_t shared_memory_object::priv_open_or_create
    (ipcdetail::create_enum_t type, const CharT *filename, mode_t mode, const permissions &perm)
 {
    m_filename = filename;
@@ -233,8 +245,7 @@ inline bool shared_memory_object::priv_open_or_create
 
    //Set accesses
    if (mode != read_write && mode != read_only){
-      error_info err = other_error;
-      throw interprocess_exception(err);
+      return other_error;
    }
 
    switch(type){
@@ -249,8 +260,7 @@ inline bool shared_memory_object::priv_open_or_create
       break;
       default:
          {
-            error_info err = other_error;
-            throw interprocess_exception(err);
+            return other_error;
          }
    }
 
@@ -258,11 +268,11 @@ inline bool shared_memory_object::priv_open_or_create
    if(m_handle == ipcdetail::invalid_file()){
       error_info err = system_error_code();
       this->priv_close();
-      throw interprocess_exception(err);
+      return err.get_error_code();
    }
 
    m_mode = mode;
-   return true;
+   return error_code_t::no_error;
 }
 
 #if defined(BOOST_INTERPROCESS_WCHAR_NAMED_RESOURCES)
@@ -295,12 +305,13 @@ inline bool shared_memory_object::remove(const char *filename)
    } BOOST_CATCH_END
 }
 
-inline void shared_memory_object::truncate(offset_t length)
+inline error_code_t shared_memory_object::truncate(offset_t length)
 {
    if(!ipcdetail::truncate_file(m_handle, (std::size_t)length)){
       error_info err = system_error_code();
-      throw interprocess_exception(err);
+      return err.get_error_code();
    }
+   return no_error;
 }
 
 inline void shared_memory_object::priv_close()
