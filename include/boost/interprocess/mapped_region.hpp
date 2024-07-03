@@ -475,7 +475,7 @@ inline mapped_region::mapped_region
          ec = priv_size_from_mapping_size(mapping_size, offset, page_offset, size);
         if (ec != no_error)
         {
-            return ec;
+            return;
         }
       }
 
